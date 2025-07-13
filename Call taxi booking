@@ -1,0 +1,149 @@
+#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+using namespace std;
+
+struct Booking {
+    int bookingId;
+    int customerId;
+    char from;
+    char to;
+    int pickupTime;
+    int dropTime;
+    int amount;
+};
+
+struct Taxi {
+    int id;
+    char currentSpot;
+    int freeTime;
+    int totalEarnings;
+    vector<Booking> history;
+
+    Taxi(int id) {
+        this->id = id;
+        currentSpot = 'A';
+        freeTime = 0;
+        totalEarnings = 0;
+    }
+};
+
+vector<Taxi> taxis;
+int bookingCounter = 1;
+
+int getPointDistance(char a, char b) {
+    return abs(a - b) * 15;
+}
+
+int calculateFare(int km) {
+    return 100 + (km > 5 ? (km - 5) * 10 : 0);
+}
+
+int calculateTime(char from, char to) {
+    return abs(from - to); // each point = 1 hr
+}
+
+bool isTaxiAvailable(Taxi &taxi, char from, int time) {
+    int travelTime = abs(from - taxi.currentSpot);
+    return (taxi.freeTime + travelTime) <= time;
+}
+
+void bookTaxi(int customerId, char from, char to, int pickupTime) {
+    vector<Taxi*> candidates;
+
+    for (auto &taxi : taxis) {
+        if (isTaxiAvailable(taxi, from, pickupTime)) {
+            candidates.push_back(&taxi);
+        }
+    }
+
+    if (candidates.empty()) {
+        cout << "Booking Rejected: No Taxi Available.\n";
+        return;
+    }
+
+    sort(candidates.begin(), candidates.end(), [&](Taxi* a, Taxi* b) {
+        int distA = abs(from - a->currentSpot);
+        int distB = abs(from - b->currentSpot);
+        if (distA == distB)
+            return a->totalEarnings < b->totalEarnings;
+        return distA < distB;
+    });
+
+    Taxi *chosen = candidates[0];
+
+    int km = getPointDistance(from, to);
+    int fare = calculateFare(km);
+    int dropTime = pickupTime + calculateTime(from, to);
+
+    Booking b;
+    b.bookingId = bookingCounter++;
+    b.customerId = customerId;
+    b.from = from;
+    b.to = to;
+    b.pickupTime = pickupTime;
+    b.dropTime = dropTime;
+    b.amount = fare;
+
+    chosen->history.push_back(b);
+    chosen->freeTime = dropTime;
+    chosen->currentSpot = to;
+    chosen->totalEarnings += fare;
+
+    cout << "Taxi-" << chosen->id << " is allotted.\n";
+}
+
+void displayTaxiDetails() {
+    for (auto &taxi : taxis) {
+        cout << "\nTaxi-" << taxi.id << "    Total Earnings: Rs." << taxi.totalEarnings << "\n";
+        cout << "BookingID   CustomerID   From   To   Pickup   Drop   Amount\n";
+        for (auto &b : taxi.history) {
+            printf("   %-10d%-13d%-7c%-6c%-9d%-7dRs. %d\n",
+                   b.bookingId, b.customerId, b.from, b.to, b.pickupTime, b.dropTime, b.amount);
+        }
+    }
+}
+
+int main() {
+    // Create 4 taxis
+    for (int i = 1; i <= 4; i++) {
+        taxis.push_back(Taxi(i));
+    }
+
+    while (true) {
+        cout << "\n=== Call Taxi Booking ===\n";
+        cout << "1. Book Taxi\n2. Display Taxi Details\n3. Exit\n";
+        int choice;
+        cin >> choice;
+
+        if (choice == 1) {
+            int customerId, pickupTime;
+            char from, to;
+            cout << "Enter Customer ID: ";
+            cin >> customerId;
+            cout << "Enter Pickup Point (A-F): ";
+            cin >> from;
+            cout << "Enter Drop Point (A-F): ";
+            cin >> to;
+            cout << "Enter Pickup Time (0-23): ";
+            cin >> pickupTime;
+
+            if (from < 'A' || from > 'F' || to < 'A' || to > 'F' || from == to) {
+                cout << "Invalid Route.\n";
+                continue;
+            }
+
+            bookTaxi(customerId, from, to, pickupTime);
+        } else if (choice == 2) {
+            displayTaxiDetails();
+        } else if (choice == 3) {
+            cout << "Thank you for using the Taxi Booking App.\n";
+            break;
+        } else {
+            cout << "Invalid option!\n";
+        }
+    }
+
+    return 0;
+}
