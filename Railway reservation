@@ -1,0 +1,98 @@
+#include <iostream>
+#include <vector>
+#include <queue>
+#include <map>
+using namespace std;
+
+// Passenger structure
+struct Passenger {
+    int id;
+    string name;
+    string coachType; // "AC", "Non-AC", "Seater"
+    int seatNumber;
+    bool isWaiting;
+
+    Passenger(int pid, string pname, string type, int seat, bool waiting)
+        : id(pid), name(pname), coachType(type), seatNumber(seat), isWaiting(waiting) {}
+};
+
+// Global variables
+int passengerID = 1;
+map<string, vector<Passenger>> confirmedSeats;
+map<string, queue<Passenger>> waitlists;
+const int MAX_SEATS = 60;
+const int MAX_WAIT = 10;
+
+void initializeSystem() {
+    confirmedSeats["AC"] = {};
+    confirmedSeats["Non-AC"] = {};
+    confirmedSeats["Seater"] = {};
+    waitlists["AC"] = {};
+    waitlists["Non-AC"] = {};
+    waitlists["Seater"] = {};
+}
+
+void bookTicket() {
+    string name, type;
+    cout << "Enter Passenger Name: ";
+    cin.ignore();
+    getline(cin, name);
+    cout << "Enter Coach Type (AC / Non-AC / Seater): ";
+    cin >> type;
+
+    if (type != "AC" && type != "Non-AC" && type != "Seater") {
+        cout << "Invalid coach type.\n";
+        return;
+    }
+
+    auto &seats = confirmedSeats[type];
+    auto &wait = waitlists[type];
+
+    if (seats.size() < MAX_SEATS) {
+        seats.push_back(Passenger(passengerID, name, type, seats.size() + 1, false));
+        cout << "✅ Ticket booked. Passenger ID: " << passengerID << ", Seat No: " << seats.size() << "\n";
+    } else if (wait.size() < MAX_WAIT) {
+        wait.push(Passenger(passengerID, name, type, -1, true));
+        cout << "⚠️  All seats full. Added to waitlist. Passenger ID: " << passengerID << "\n";
+    } else {
+        cout << "❌ Booking failed: No seats or waitlist available.\n";
+        return;
+    }
+
+    passengerID++;
+}
+
+void cancelTicket() {
+    int pid;
+    cout << "Enter Passenger ID to cancel: ";
+    cin >> pid;
+
+    for (auto &entry : confirmedSeats) {
+        auto &vec = entry.second;
+        for (size_t i = 0; i < vec.size(); ++i) {
+            if (vec[i].id == pid) {
+                cout << "🗑️  Ticket for " << vec[i].name << " cancelled from " << entry.first << " Coach.\n";
+                vec.erase(vec.begin() + i);
+
+                // Shift seat numbers
+                for (size_t j = i; j < vec.size(); ++j)
+                    vec[j].seatNumber = j + 1;
+
+                // Promote from waitlist
+                auto &wait = waitlists[entry.first];
+                if (!wait.empty()) {
+                    Passenger p = wait.front();
+                    wait.pop();
+                    p.seatNumber = vec.size() + 1;
+                    p.isWaiting = false;
+                    vec.push_back(p);
+                    cout << "🎉 Passenger " << p.name << " from waitlist allocated Seat No: " << p.seatNumber << "\n";
+                }
+                return;
+            }
+        }
+    }
+
+    // Try waitlist
+    for (auto &entry : waitlists) {
+        queue<Passenger> &q = entry.second;
